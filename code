@@ -1,0 +1,280 @@
+!pip install tensorflow==2.12.0
+
+
+import pandas as pd
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+
+from sklearn.datasets import load_iris
+iris_data = load_iris()
+
+
+
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+
+X = iris_data.data
+y = iris_data.target
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', StandardScaler(), slice(0, 4))
+    ],
+    remainder='passthrough'
+)
+
+onehot_encoder = OneHotEncoder(sparse=False, categories='auto')
+y_onehot = onehot_encoder.fit_transform(y.reshape(-1, 1))
+
+pipeline = Pipeline(steps=[
+    ('preprocessor', preprocessor)
+])
+
+X_scaled = pipeline.fit_transform(X)
+
+
+
+
+from sklearn.model_selection import train_test_split
+
+X_train, X_temp, y_train, y_temp = train_test_split(X_scaled, y_onehot, test_size=0.4, random_state=42)
+X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
+
+import matplotlib.pyplot as plt
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+
+def build_model(hidden_layers, activation, neurons):
+    model = Sequential()
+    model.add(Dense(neurons, input_dim=4, activation=activation))
+    for _ in range(hidden_layers - 1):
+        model.add(Dense(max(neurons, 1), activation=activation))
+    model.add(Dense(3, activation='softmax'))
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    return model
+
+def plot_history(history, title):
+    plt.figure(figsize=(12, 4))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('Model Loss: ' + title)
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Validation'], loc='upper left')
+
+    plt.subplot(1, 2, 2)
+    plt.plot(history.history['accuracy'])
+    plt.plot(history.history['val_accuracy'])
+    plt.title('Model Accuracy: ' + title)
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Validation'], loc='upper left')
+
+    plt.tight_layout()
+    plt.show()
+
+hidden_layers_range = range(1, 4)
+activations = ['relu', 'tanh', 'leaky_relu']
+
+for activation in activations:
+    for hidden_layers in hidden_layers_range:
+        for neurons in range(hidden_layers, 11):
+            print(f"Training Model: {hidden_layers} hidden layers, {activation} activation function, {neurons} neurons")
+            model = build_model(hidden_layers, activation, neurons)
+            history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=50, batch_size=32, verbose=0)
+            title = f"{hidden_layers} Hidden Layers, {activation.capitalize()} Activation, {neurons} Neurons"
+            plot_history(history, title)
+from sklearn.metrics import classification_report
+
+model = Sequential()
+model.add(Dense(10, input_dim=4, activation='relu'))
+model.add(Dense(3, activation='softmax'))
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=50, batch_size=32, verbose=1)
+
+train_loss, train_accuracy = model.evaluate(X_train, y_train, verbose=0)
+val_loss, val_accuracy = model.evaluate(X_val, y_val, verbose=0)
+print("Training Accuracy:", train_accuracy)
+print("Validation Accuracy:", val_accuracy)
+
+test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=0)
+print("Test Accuracy:", test_accuracy)
+
+y_pred = model.predict(X_test)
+y_pred_classes = np.argmax(y_pred, axis=1)
+y_true = np.argmax(y_test, axis=1)
+
+print(classification_report(y_true, y_pred_classes))
+
+
+from sklearn.metrics import classification_report
+
+model = Sequential()
+model.add(Dense(10, input_dim=4, activation='relu'))
+model.add(Dense(3, activation='softmax'))
+
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=100, batch_size=32, verbose=1)
+
+train_loss, train_accuracy = model.evaluate(X_train, y_train, verbose=0)
+val_loss, val_accuracy = model.evaluate(X_val, y_val, verbose=0)
+print("Training Accuracy:", train_accuracy)
+print("Validation Accuracy:", val_accuracy)
+
+test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=0)
+print("Test Accuracy:", test_accuracy)
+
+y_pred = model.predict(X_test)
+y_pred_classes = np.argmax(y_pred, axis=1)
+y_true = np.argmax(y_test, axis=1)
+
+print(classification_report(y_true, y_pred_classes))
+
+
+
+from tensorflow.keras.optimizers import Adam, SGD
+from itertools import product
+
+def build_model(neurons, activation, optimizer, learning_rate, num_hidden_layers):
+    model = Sequential()
+    model.add(Dense(neurons, input_dim=4, activation=activation))
+
+    for _ in range(num_hidden_layers):
+        model.add(Dense(neurons, activation=activation))
+
+    model.add(Dense(3, activation='softmax'))
+
+    if optimizer == 'adam':
+        opt = Adam(learning_rate=learning_rate)
+    elif optimizer == 'sgd':
+        opt = SGD(learning_rate=learning_rate)
+
+    model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
+    return model
+
+neurons_list = [5, 10, 20]
+activations = ['relu', 'tanh']
+optimizers = ['adam', 'sgd']
+learning_rates = [0.001, 0.01, 0.1]
+num_hidden_layers_list = [1, 2, 3]
+
+for neurons, activation, optimizer, learning_rate, num_hidden_layers in product(neurons_list, activations, optimizers, learning_rates, num_hidden_layers_list):
+    print(f"Training Model: {neurons} neurons, {activation} activation, {optimizer} optimizer, {learning_rate} learning rate, {num_hidden_layers} hidden layers")
+    model = build_model(neurons, activation, optimizer, learning_rate, num_hidden_layers)
+    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=50, batch_size=8, verbose=0)
+    title = f"{neurons} Neurons, {activation.capitalize()} Activation, {optimizer.upper()} Optimizer, {learning_rate} Learning Rate, {num_hidden_layers} Hidden Layers"
+    plot_history(history, title)
+
+    train_loss, train_accuracy = model.evaluate(X_train, y_train, verbose=0)
+    val_loss, val_accuracy = model.evaluate(X_val, y_val, verbose=0)
+    test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=0)
+    print(f"Training Accuracy: {train_accuracy}")
+    print(f"Validation Accuracy: {val_accuracy}")
+    print(f"Test Accuracy: {test_accuracy}")
+
+    y_pred = model.predict(X_test)
+    y_pred_classes = np.argmax(y_pred, axis=1)
+    y_true = np.argmax(y_test, axis=1)
+    print(classification_report(y_true, y_pred_classes))
+
+def create_model(neurons=10, activation='relu', optimizer='adam', learning_rate=0.001, num_hidden_layers=1):
+    model = Sequential()
+    model.add(Dense(neurons, input_shape=(4,), activation=activation))
+
+    for _ in range(num_hidden_layers):
+        model.add(Dense(neurons, activation=activation))
+
+    model.add(Dense(3, activation='softmax'))
+
+    if optimizer == 'adam':
+        opt = Adam(learning_rate=learning_rate)
+    elif optimizer == 'sgd':
+        opt = SGD(learning_rate=learning_rate)
+
+    model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
+    return model
+
+model = KerasClassifier(build_fn=create_model, verbose=0)
+
+param_grid = {
+    'neurons': [5, 10, 15],
+    'activation': ['relu', 'tanh', 'sigmoid'],
+    'optimizer': ['adam', 'sgd'],
+    'learning_rate': [0.001, 0.01, 0.1],
+    'epochs': [50, 100],
+    'batch_size': [8, 16, 32],
+    'num_hidden_layers': [1, 2, 3]
+}
+
+grid = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=10, cv=3, verbose=1)
+grid_result = grid.fit(X_train, y_train)
+
+print(f'Best: {grid_result.best_score_} using {grid_result.best_params_}')
+
+best_params = grid_result.best_params_
+
+best_model = create_model(
+    neurons=best_params['neurons'],
+    activation=best_params['activation'],
+    optimizer=best_params['optimizer'],
+    learning_rate=best_params['learning_rate'],
+    num_hidden_layers=best_params['num_hidden_layers']
+)
+
+history = best_model.fit(X_train, y_train, validation_split=0.2, epochs=best_params['epochs'], batch_size=best_params['batch_size'], verbose=0)
+
+test_loss, test_accuracy = best_model.evaluate(X_test, y_test, verbose=0)
+
+epochs = range(1, best_params['epochs'] + 1)
+
+plt.figure(figsize=(14, 5))
+
+plt.subplot(1, 2, 1)
+plt.plot(epochs, history.history['accuracy'], label='Train Accuracy')
+plt.plot(epochs, history.history['val_accuracy'], label='Validation Accuracy')
+plt.hlines(test_accuracy, xmin=1, xmax=best_params['epochs'], colors='r', linestyles='dashed', label='Test Accuracy')
+plt.title('Model Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+
+plt.subplot(1, 2, 2)
+plt.plot(epochs, history.history['loss'], label='Train Loss')
+plt.plot(epochs, history.history['val_loss'], label='Validation Loss')
+plt.hlines(test_loss, xmin=1, xmax=best_params['epochs'], colors='r', linestyles='dashed', label='Test Loss')
+plt.title('Model Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+
+
+!pip install lime
+
+
+
+from lime.lime_tabular import LimeTabularExplainer
+
+class_names = iris_data.target_names
+explainer = LimeTabularExplainer(X_train, feature_names=None, class_names=class_names, discretize_continuous=True)
+
+instance_idx = 9
+instance = X_test[instance_idx]
+true_class = y_test[instance_idx]
+
+def predict_fn(x):
+    return best_model.predict(x)
+
+explanation = explainer.explain_instance(instance, predict_fn, num_features=len(X_test[9]), top_labels=3)
+
+explanation.show_in_notebook()
+
